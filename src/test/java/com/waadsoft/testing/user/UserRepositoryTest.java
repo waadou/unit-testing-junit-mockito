@@ -1,7 +1,10 @@
 package com.waadsoft.testing.user;
 
+import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,397 +17,544 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 class UserRepositoryTest {
 
     private final UserRepository userRepository = new UserRepositoryImpl();
-    User bako = new User("bako", "bako@example.com");
-    User alaza = new User("alaza", "alaza@example.com");
-    User aminou = new User("aminou", "aminou@example.com");
 
     @Test
     void shouldFindNoUserWhenEmptyRepository() {
-        Optional<User> found = userRepository.findById(1);
+        int userId = 1;
+
+        Optional<User> found = userRepository.findById(userId);
+
         assertThat(found).isEmpty();
+    }
 
-        found = userRepository.findById(null);
+    @Test
+    void shouldFindNoUserWhenInvalidUserIdGiven() {
+        Integer userId = null;
+        User user = givenUserAlaza();
+        userRepository.add(user);
+
+        Optional<User> found = userRepository.findById(userId);
+
         assertThat(found).isEmpty();
     }
 
     @Test
-    void shouldAddUser() {
-        userRepository.add(alaza);
-        Optional<User> found = userRepository.findByEmail(alaza.getEmail());
+    void shouldAddWhenGivenValidUser() {
+        User user = givenUserAlaza();
+        String email = user.getEmail();
+        String username = user.getUsername();
+        userRepository.add(user);
 
-        assertThat(found).isNotEmpty();
+        Optional<User> found = userRepository.findByEmail(email);
 
-        User user = found.get();
-        assertThat(user).extracting("email").isEqualTo("alaza@example.com");
-        assertThat(user).extracting("username").isEqualTo("alaza");
+        assertSameEmail(found, email);
+        assertSameUsername(found, username);
     }
 
     @Test
-    void shouldThrowExceptionWhenAddWithInvalidUser() {
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> userRepository.add(null))
-                .withMessageContaining("Invalid user specified");
+    void shouldThrowExceptionWhenInvalidUserAdded() {
+        User user = null;
+        String exceptionMsg = "Invalid user specified";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.add(user), exceptionMsg);
     }
 
     @Test
-    void shouldThrowExceptionWhenAddTwoUsersWithSameEmail() {
-        User otherAlaza = new User("other.alaza", "alaza@example.com");
+    void shouldThrowExceptionWhenTwoUsersWithSameEmailAdded() {
+        User user1 = givenUserAlaza();
+        String email = user1.getEmail();
+        User user2 = new User("baba.alaza", email);
+        String message = "User already exists";
+        userRepository.add(user1);
 
-        assertThatExceptionOfType(DuplicateUserException.class).isThrownBy(() -> {
-                    userRepository.add(alaza);
-                    userRepository.add(otherAlaza);
-                })
-                .withMessageContaining("User already exists");
+        assertExceptionThrown(DuplicateUserException.class, () -> userRepository.add(user2), message);
     }
 
     @Test
-    void shouldThrowExceptionWhenAddTwoUsersWithSameUsername() {
-        User otherAlaza = new User("alaza", "bako@example.com");
+    void shouldThrowExceptionWhenTwoUsersWithSameUsernameAdded() {
+        User user1 = givenUserAlaza();
+        String username = user1.getUsername();
+        User user2 = new User(username, "bako@example.com");
+        String message = "User already exists";
+        userRepository.add(user1);
 
-        assertThatExceptionOfType(DuplicateUserException.class).isThrownBy(() -> {
-                    userRepository.add(alaza);
-                    userRepository.add(otherAlaza);
-                })
-                .withMessageContaining("User already exists");
+        assertExceptionThrown(DuplicateUserException.class, () -> userRepository.add(user2), message);
     }
 
     @Test
-    void shouldUpdateUser() {
-        userRepository.add(alaza);
+    void shouldUpdateWhenUserExists() {
+        User user = userRepository.add(givenUserAlaza());
+        String newEmail = "modified.user@example.com";
 
-        User dbUser = userRepository.findByEmail(alaza.getEmail()).get();
-        User modifiedUser = new User(dbUser.getUserId(), dbUser.getUsername(), "modified.alaza@example.com");
-        User updatedUser = userRepository.update(modifiedUser);
+        User updatedUser = userRepository.update(new User(user.getUserId(), user.getUsername(), newEmail));
 
-        assertThat(dbUser.getEmail()).isNotEqualTo(updatedUser.getEmail());
-        assertThat(dbUser.getUsername()).isEqualTo(updatedUser.getUsername());
+        assertThat(updatedUser.getEmail()).isNotEqualTo(user.getEmail());
+        assertThat(updatedUser.getUsername()).isEqualTo(user.getUsername());
     }
 
     @Test
     void shouldThrowExceptionWhenUpdateWithInvalidUser() {
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> userRepository.update(null))
-                .withMessageContaining("Invalid user specified");
+        User user = null;
+        String message = "Invalid user specified";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.update(user), message);
     }
 
     @Test
     void shouldThrowExceptionWhenUpdateWithNonExistentUser() {
-        assertThat(userRepository.findAll()).isEmpty();
+        User user = givenUserAlaza();
+        String message = "User doesn't exist";
 
-        assertThatExceptionOfType(UserNotFoundException.class).isThrownBy(() -> userRepository.update(alaza))
-                .withMessageContaining("User doesn't exist");
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.update(user), message);
     }
 
     @Test
-    void shouldFindUserByEmail() {
-        userRepository.add(alaza);
-        Optional<User> result = userRepository.findByEmail(alaza.getEmail());
+    void shouldFindByEmailWhenUserExists() {
+        User user = givenUserAlaza();
+        userRepository.add(user);
 
-        assertThat(result).isNotEmpty()
-                .get().extracting("username")
-                .isEqualTo(alaza.getUsername());
+        Optional<User> actual = userRepository.findByEmail(user.getEmail());
 
-        assertThat(result).get().extracting("email")
-                .isEqualTo(alaza.getEmail());
+        assertSameEmail(actual, user.getEmail());
+        assertSameUsername(actual, user.getUsername());
     }
 
     @Test
-    void shouldFindUserByUsername() {
-        userRepository.add(alaza);
-        Optional<User> found = userRepository.findByUsername(alaza.getUsername());
+    void shouldFindByUsernameWhenUserExists() {
+        User user = givenUserAlaza();
+        userRepository.add(user);
 
-        assertThat(found).isNotEmpty()
-                .get().extracting("username")
-                .isEqualTo(alaza.getUsername());
+        Optional<User> actual = userRepository.findByUsername(user.getUsername());
 
-        assertThat(found).get().extracting("email")
-                .isEqualTo(alaza.getEmail());
+        assertSameEmail(actual, user.getEmail());
+        assertSameUsername(actual, user.getUsername());
     }
 
     @Test
-    void shouldCountAllUsers() {
-        assertThat(userRepository.count()).isEqualTo(0);
+    void shouldCountWhenUsersExist() {
+        User user1 = givenUserAlaza();
+        User user2 = givenUserBako();
+        userRepository.add(user1);
+        userRepository.add(user2);
 
-        userRepository.add(alaza);
-        userRepository.add(bako);
+        int actual = userRepository.count();
 
-        assertThat(userRepository.count()).isEqualTo(2);
+        assertThat(actual).isEqualTo(2);
     }
 
     @Test
-    void shouldFindAllUsers() {
-        assertThat(userRepository.findAll()).isEmpty();
+    void shouldCountWhenNoUserExists() {
+        int actual = userRepository.count();
 
-        userRepository.add(alaza);
-        userRepository.add(bako);
-
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(2)
-                .containsOnly(bako, alaza);
+        assertThat(actual).isEqualTo(0);
     }
 
     @Test
-    void shouldFindAllByIds() {
-        List<User> foundUsers = userRepository.findAllById(null);
-        assertThat(foundUsers).isEmpty();
+    void shouldFindAllWhenUsersExist() {
+        User user1 = givenUserAlaza();
+        User user2 = givenUserBako();
+        User user3 = givenUserAminou();
+        userRepository.add(user1);
+        userRepository.add(user2);
+        userRepository.add(user3);
 
-        assertThat(userRepository.findAllById(List.of())).isEmpty();
+        List<User> actual = userRepository.findAll();
 
-        List<Integer> ids = List.of(1, 3, 8, 2, 58);
-        assertThat(userRepository.findAllById(ids)).isEmpty();
-
-        userRepository.add(alaza);
-        userRepository.add(bako);
-
-        assertThat(userRepository.findAllById(ids)).isNotEmpty()
-                .hasSize(2)
-                .containsOnly(alaza, bako);
-    }
-
-    @Test
-    void shouldFindAllUsersByEmail() {
-        List<User> foundUsers = userRepository.findAllByEmail(null);
-        assertThat(foundUsers).isEmpty();
-
-        foundUsers = userRepository.findAllByEmail(List.of());
-        assertThat(foundUsers).isEmpty();
-
-        List<String> emails = List.of("alaza@example.com", "asmiou@gmail.com", "bako@example.com");
-        foundUsers = userRepository.findAllByEmail(emails);
-        assertThat(foundUsers).isEmpty();
-
-        userRepository.add(alaza);
-        userRepository.add(bako);
-
-        foundUsers = userRepository.findAllByEmail(emails);
-
-        assertThat(foundUsers).isNotEmpty()
-                .hasSize(2)
-                .containsOnly(alaza, bako);
-    }
-
-    @Test
-    void shouldFindAllUsersByUsername() {
-        List<User> foundUsers = userRepository.findAllByUsername(null);
-        assertThat(foundUsers).isEmpty();
-
-        foundUsers = userRepository.findAllByUsername(List.of());
-        assertThat(foundUsers).isEmpty();
-
-        List<String> usernames = List.of("alaza", "asmiou", "bako");
-        foundUsers = userRepository.findAllByUsername(usernames);
-        assertThat(foundUsers).isEmpty();
-
-        userRepository.add(alaza);
-        userRepository.add(bako);
-
-        foundUsers = userRepository.findAllByUsername(usernames);
-
-        assertThat(foundUsers).isNotEmpty()
-                .hasSize(2)
-                .containsOnly(alaza, bako);
-    }
-
-    @Test
-    void shouldDeleteUser() {
-        userRepository.add(bako);
-        userRepository.add(alaza);
-        User addedAminou = userRepository.add(aminou);
-
-        assertThat(userRepository.findAll()).isNotEmpty()
+        assertThat(actual).isNotEmpty()
                 .hasSize(3)
-                .containsOnly(aminou, alaza, bako);
+                .containsOnly(user1, user2, user3);
+    }
 
-        userRepository.delete(alaza);
+    @Test
+    void shouldFindAllByIdsWhenUsersExist() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<Integer> ids = Arrays.asList(user1.getUserId(), user2.getUserId(), user3.getUserId());
+
+        List<User> actual = userRepository.findAllById(ids);
+
+        assertThat(actual).isNotEmpty()
+                .hasSize(3)
+                .containsOnly(user2, user3, user1);
+    }
+
+    @Test
+    void shouldReturnNothingWhenFindAllByIdsWithInvalidIdCollection() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<Integer> ids = null; // Invalid ID collection
+
+        List<User> actual = userRepository.findAllById(ids);
+
+        assertThat(actual).isEmpty();
+    }
+
+    @Test
+    void shouldReturnNothingWhenFindAllByIdsWithEmptyIdCollection() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<Integer> ids = Collections.emptyList(); // Empty ID collection
+
+        List<User> actual = userRepository.findAllById(ids);
+
+        assertThat(actual).isEmpty();
+    }
+
+    @Test
+    void shouldFindAllByEmailWhenUsersExist() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<String> emails = Arrays.asList(user1.getEmail(), user2.getEmail(), user3.getEmail());
+
+        List<User> actual = userRepository.findAllByEmail(emails);
+
+        assertThat(actual).isNotEmpty()
+                .hasSize(3)
+                .containsOnly(user2, user3, user1);
+    }
+
+    @Test
+    void shouldReturnNothingWhenFindAllByEmailWithInvalidEmailCollection() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<String> emails = null; // Invalid email collection
+
+        List<User> actual = userRepository.findAllByEmail(emails);
+
+        assertThat(actual).isEmpty();
+    }
+
+    @Test
+    void shouldReturnNothingWhenFindAllByEmailWithEmptyEmailCollection() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<String> emails = Collections.emptyList(); // Empty email collection
+
+        List<User> actual = userRepository.findAllByEmail(emails);
+
+        assertThat(actual).isEmpty();
+    }
+
+
+    @Test
+    void shouldFindAllByUsernameWhenUsersExist() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<String> usernames = Arrays.asList(user1.getUsername(), user2.getUsername(), user3.getUsername());
+
+        List<User> actual = userRepository.findAllByUsername(usernames);
+
+        assertThat(actual).isNotEmpty()
+                .hasSize(3)
+                .containsOnly(user2, user3, user1);
+    }
+
+    @Test
+    void shouldReturnNothingWhenFindAllByUsernameWithInvalidUsernameCollection() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<String> usernames = null; // Invalid collection of usernames
+
+        List<User> actual = userRepository.findAllByUsername(usernames);
+
+        assertThat(actual).isEmpty();
+    }
+
+    @Test
+    void shouldReturnNothingWhenFindAllByUsernameWithEmptyUsernameCollection() {
+        User user1 = userRepository.add(givenUserAlaza());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAminou());
+        List<String> usernames = Collections.emptyList(); // Empty collection of usernames
+
+        List<User> actual = userRepository.findAllByUsername(usernames);
+
+        assertThat(actual).isEmpty();
+    }
+
+    @Test
+    void shouldDeleteWhenUserExists() {
+        User alaza = givenUserAlaza();
+        User bako = givenUserBako();
+        userRepository.add(bako);
+        userRepository.add(alaza);
+        User aminou = userRepository.add(givenUserAminou());
+
+        userRepository.delete(bako);
+
         assertThat(userRepository.findAll()).isNotEmpty()
                 .hasSize(2)
-                .containsOnly(aminou, bako);
-
-        userRepository.delete(new User("haddy", "bako@example.com"));
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(aminou);
-
-        userRepository.delete(addedAminou);
-        assertThat(userRepository.findAll()).isEmpty();
+                .containsOnly(alaza, aminou);
     }
 
     @Test
     void shouldThrowExceptionWhenDeleteWithInvalidUser() {
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> userRepository.delete(null))
-                .withMessageContaining("Invalid user specified");
+        User user = null;
+        String message = "Invalid user specified";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.delete(user), message);
     }
 
     @Test
     void shouldThrowExceptionWhenDeleteWithNonExistentUser() {
-        userRepository.add(bako);
+        User user1 = givenUserBako();
+        User user2 = givenUserAminou();
+        userRepository.add(user1);
+        String message = "No user found";
 
-        assertThatExceptionOfType(UserNotFoundException.class).isThrownBy(() -> userRepository.delete(alaza))
-                .withMessageContaining("No user found");
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.delete(user2), message);
     }
 
     @Test
-    void shouldDeleteUserById() {
-        User addedUser = userRepository.add(alaza);
+    void shouldDeleteByIdWhenUserExists() {
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        Integer userId = user1.getUserId();
+
+        userRepository.deleteById(userId);
 
         assertThat(userRepository.findAll()).isNotEmpty()
                 .hasSize(1)
-                .containsOnly(alaza);
+                .containsOnly(user2);
+    }
 
-        userRepository.deleteById(addedUser.getUserId());
+    @Test
+    void shouldThrowExceptionWhenDeleteByIdWithNoUserId() {
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        Integer userId = null;
+        String message = "User to be deleted doesn't exist";
 
-        assertThat(userRepository.findAll()).isEmpty();
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.deleteById(userId), message);
     }
 
     @Test
     void shouldThrowExceptionWhenDeleteByIdWithInvalidUserId() {
-        User addedUser = userRepository.add(alaza);
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        Integer userId = -1000;
+        String message = "User to be deleted doesn't exist";
 
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(alaza);
-
-        Integer userId1 = null;
-        assertThatExceptionOfType(UserNotFoundException.class).isThrownBy(() -> userRepository.deleteById(userId1))
-                .withMessageContaining("User to be deleted doesn't exist");
-
-        Integer userId2 = -25;
-        assertThatExceptionOfType(UserNotFoundException.class).isThrownBy(() -> userRepository.deleteById(userId2))
-                .withMessageContaining("User to be deleted doesn't exist");
-
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(alaza);
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.deleteById(userId), message);
     }
 
     @Test
-    void shouldDeleteUserByEmail() {
-        User addedUser = userRepository.add(alaza);
+    void shouldDeleteByEmailWhenUserExists() {
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        String email = user1.getEmail();
+
+        userRepository.deleteByEmail(email);
 
         assertThat(userRepository.findAll()).isNotEmpty()
                 .hasSize(1)
-                .containsOnly(alaza);
+                .containsOnly(user2);
+    }
 
-        userRepository.deleteByEmail(addedUser.getEmail());
+    @Test
+    void shouldThrowExceptionWhenDeleteByEmailWithNoEmail() {
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        String email = null;
+        String message = "User to be deleted doesn't exist";
 
-        assertThat(userRepository.findAll()).isEmpty();
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.deleteByEmail(email), message);
     }
 
     @Test
     void shouldThrowExceptionWhenDeleteByEmailWithInvalidEmail() {
-        whenWeAddUsers(alaza);
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        String email = "azllammzmmzmm@vcggdffgs.com";
+        String message = "User to be deleted doesn't exist";
 
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(alaza);
-
-        String email = "cxwQD@gdg";
-        assertThatExceptionOfType(UserNotFoundException.class).isThrownBy(() -> userRepository.deleteByEmail(email))
-                .withMessageContaining("User to be deleted doesn't exist");
-
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(alaza);
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.deleteByEmail(email), message);
     }
 
     @Test
-    void shouldDeleteUserByUsername() {
-        whenWeAddUsers(alaza);
+    void shouldDeleteByUsernameWhenUserExists() {
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        String username = user1.getUsername();
+
+        userRepository.deleteByUsername(username);
 
         assertThat(userRepository.findAll()).isNotEmpty()
                 .hasSize(1)
-                .containsOnly(alaza);
+                .containsOnly(user2);
+    }
 
-        userRepository.deleteByUsername(alaza.getUsername());
+    @Test
+    void shouldThrowExceptionWhenDeleteByUsernameWithNoUsername() {
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        String username = null;
+        String message = "User doesn't exist";
 
-        assertThat(userRepository.findAll()).isEmpty();
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.deleteByUsername(username), message);
     }
 
     @Test
     void shouldThrowExceptionWhenDeleteByUsernameWithInvalidUsername() {
-        whenWeAddUsers(alaza);
+        User user1 = userRepository.add(givenUserBako());
+        User user2 = userRepository.add(givenUserAminou());
+        String username = "azllammzmmzmm";
+        String message = "User doesn't exist";
 
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(alaza);
-
-        String username = "cxwQD@gdg";
-        assertThatExceptionOfType(UserNotFoundException.class).isThrownBy(() -> userRepository.deleteByUsername(username))
-                .withMessageContaining("User doesn't exist");
-
-        assertThat(userRepository.findAll()).isNotEmpty()
-                .hasSize(1)
-                .containsOnly(alaza);
+        assertExceptionThrown(UserNotFoundException.class, () -> userRepository.deleteByUsername(username), message);
     }
 
     @Test
-    void shouldDeleteAllByIds() {
-        List<User> foundUsers = userRepository.findAll();
-        assertThat(foundUsers).isEmpty();
+    void shouldDeleteAllByIdsWhenUsersExist() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<Integer> ids = Arrays.asList(user1.getUserId(), user2.getUserId());
 
-        whenWeAddUsers(alaza, bako);
-
-        List<Integer> ids = List.of(1, 2);
         userRepository.deleteAllById(ids);
-        assertThat(foundUsers).isEmpty();
-    }
-
-    @Test
-    void shouldThrowExceptionWhenDeleteAllByIdsWithoutIds() {
-        List<User> foundUsers = userRepository.findAll();
-        assertThat(foundUsers).isEmpty();
-
-        List<Integer> ids = List.of();
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> userRepository.deleteAllById(ids))
-                .withMessageContaining("Invalid collection");
-    }
-
-    @Test
-    void shouldDeleteAllByEmail() {
-        assertThat(userRepository.findAll()).isEmpty();
-
-        whenWeAddUsers(alaza, bako);
 
         assertThat(userRepository.findAll()).isNotEmpty()
-                .containsOnly(alaza, bako);
+                .hasSize(1)
+                .containsOnly(user3);
+    }
 
-        List<String> emails = List.of(alaza.getEmail(), bako.getEmail());
+    @Test
+    void shouldThrowExceptionWhenDeleteAllByIdsWithInvalidIdCollection() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<Integer> ids = null;
+        String message = "Invalid collection";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.deleteAllById(ids), message);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenDeleteAllByIdsWithEmptyCollection() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<Integer> ids = Collections.emptyList();
+        String message = "Invalid collection";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.deleteAllById(ids), message);
+    }
+
+    @Test
+    void shouldDeleteAllByEmailWhenUsersExist() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<String> emails = Arrays.asList(user1.getEmail(), user2.getEmail());
+
         userRepository.deleteAllByEmail(emails);
-        assertThat(userRepository.findAll()).isEmpty();
-    }
-
-    @Test
-    void shouldThrowExceptionWhenDeleteAllByEmailWithoutEmails() {
-        assertThat(userRepository.findAll()).isEmpty();
-
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> userRepository.deleteAllByEmail(List.of()))
-                .withMessageContaining("Invalid collection");
-    }
-
-    @Test
-    void shouldDeleteAllByUsername() {
-        assertThat(userRepository.findAll()).isEmpty();
-
-        whenWeAddUsers(alaza, bako);
 
         assertThat(userRepository.findAll()).isNotEmpty()
-                .containsOnly(alaza, bako);
+                .hasSize(1)
+                .containsOnly(user3);
+    }
 
-        List<String> usernames = List.of(alaza.getUsername(), bako.getUsername());
-        userRepository.deleteAllByUsername(usernames);
-        assertThat(userRepository.findAll()).isEmpty();
+
+    @Test
+    void shouldThrowExceptionWhenDeleteAllByEmailWithInvalidEmailCollection() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<String> emails = null;
+        String message = "Invalid collection";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.deleteAllByEmail(emails), message);
     }
 
     @Test
-    void shouldThrowExceptionWhenDeleteAllByUsernameWithoutUsernames() {
-        assertThat(userRepository.findAll()).isEmpty();
+    void shouldThrowExceptionWhenDeleteAllByEmailWithEmptyCollection() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<String> emails = Collections.emptyList();
+        String message = "Invalid collection";
 
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> userRepository.deleteAllByUsername(List.of()))
-                .withMessageContaining("Invalid collection");
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.deleteAllByEmail(emails), message);
     }
 
-    private void whenWeAddUsers(User... users) {
-        for (User user : users) {
-            userRepository.add(user);
-        }
+
+    @Test
+    void shouldDeleteAllByUsernameWhenUsersExist() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<String> usernames = Arrays.asList(user1.getUsername(), user2.getUsername());
+
+        userRepository.deleteAllByUsername(usernames);
+
+        assertThat(userRepository.findAll()).isNotEmpty()
+                .hasSize(1)
+                .containsOnly(user3);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenDeleteAllByUsernameWithInvalidUsernameCollection() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<String> usernames = null;
+        String message = "Invalid collection";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.deleteAllByUsername(usernames), message);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenDeleteAllByUsernameWithEmptyCollection() {
+        User user1 = userRepository.add(givenUserAminou());
+        User user2 = userRepository.add(givenUserBako());
+        User user3 = userRepository.add(givenUserAlaza());
+        List<String> usernames = Collections.emptyList();
+        String message = "Invalid collection";
+
+        assertExceptionThrown(IllegalArgumentException.class, () -> userRepository.deleteAllByUsername(usernames), message);
+    }
+
+    private <T> void assertExceptionThrown(Class<? extends RuntimeException> exceptionClass, ThrowableAssert.ThrowingCallable throwingCallable, String message) {
+        assertThatExceptionOfType(exceptionClass).isThrownBy(throwingCallable) // Adding second user
+                .withMessageContaining(message);
+    }
+
+    private void assertSameUsername(User user, String expectedUsername) {
+        assertThat(user.getUsername()).isEqualTo(expectedUsername);
+    }
+
+    private void assertSameUsername(Optional<User> user, String expectedUsername) {
+        assertThat(user).isNotEmpty();
+        assertSameUsername(user.get(), expectedUsername);
+    }
+
+    private void assertSameEmail(User user, String expectedEmail) {
+        assertThat(user.getEmail()).isEqualTo(expectedEmail);
+    }
+
+    private void assertSameEmail(Optional<User> user, String expectedEmail) {
+        assertThat(user).isNotEmpty();
+        assertSameEmail(user.get(), expectedEmail);
+    }
+
+    private User givenUserAlaza() {
+        return new User("alaza", "alaza@alaza.com");
+    }
+
+    private User givenUserBako() {
+        return new User("bako", "bako@bako.com");
+    }
+
+    private User givenUserAminou() {
+        return new User("aminou", "aminou@aminou.com");
     }
 }
 

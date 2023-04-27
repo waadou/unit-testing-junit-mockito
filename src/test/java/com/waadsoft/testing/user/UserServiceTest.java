@@ -1,16 +1,20 @@
 package com.waadsoft.testing.user;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-class UserServiceTest extends BaseTestCase {
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
@@ -18,169 +22,189 @@ class UserServiceTest extends BaseTestCase {
     @InjectMocks
     private UserServiceImpl userService;
 
-    User bako = new User("bako", "bako@example.com");
-    User alaza = new User("alaza", "alaza@example.com");
-    User aminou = new User("aminou", "aminou@example.com");
-    private Optional<User> optAlaza = Optional.of(alaza);
-    private List<User> users = List.of(alaza, bako);
-
     @Test
     void shouldAddUser() {
-        when(userRepository.add(alaza)).thenReturn(alaza);
-        User user = userService.addUser(alaza);
+        User user = givenUserAlaza();
+        when(userRepository.add(user)).thenReturn(user);
 
-        assertEqualUser(alaza, user);
-        verify(userRepository, times(1)).add(alaza);
+        User addedUser = userService.addUser(user);
+
+        assertEqualUser(user, addedUser);
+        verify(userRepository, atMostOnce()).add(user);
     }
 
     @Test
     void shouldUpdateUser() {
-        when(userRepository.update(alaza)).thenReturn(alaza);
-        User user = userService.updateUser(alaza);
+        User user = givenUserAlaza();
+        when(userRepository.update(user)).thenReturn(user);
+        User updatedUser = userService.updateUser(user);
 
-        assertEqualUser(alaza, user);
-        verify(userRepository, times(1)).update(alaza);
+        assertEqualUser(updatedUser, user);
+        verify(userRepository, atMostOnce()).update(user);
     }
 
     @Test
     void shouldGetUserById() {
         Integer userId = 1;
-        when(userRepository.findById(userId)).thenReturn(optAlaza);
-        Optional<User> found = userService.getUserById(userId);
+        Optional<User> expectedUser = Optional.of(givenUserAlaza());
+        when(userRepository.findById(userId)).thenReturn(expectedUser);
 
-        assertEqualUser(optAlaza, found);
-        verify(userRepository, times(1)).findById(userId);
+        Optional<User> actualUser = userService.getUserById(userId);
+
+        assertEqualUser(expectedUser, actualUser);
+        verify(userRepository, atMostOnce()).findById(userId);
     }
 
     @Test
     void shouldGetUserByEmail() {
         String email = "alaza@example.com";
-        when(userRepository.findByEmail(email)).thenReturn(optAlaza);
-        Optional<User> found = userService.getUserByEmail(email);
+        Optional<User> expectedUser = Optional.of(givenUserAlaza());
+        when(userRepository.findByEmail(email)).thenReturn(expectedUser);
 
-        assertEqualUser(optAlaza, found);
-        verify(userRepository, times(1)).findByEmail(email);
+        Optional<User> actualUser = userService.getUserByEmail(email);
+
+        assertEqualUser(expectedUser, actualUser);
+        verify(userRepository, atMostOnce()).findByEmail(email);
     }
 
     @Test
     void shouldGetUserByUsername() {
         String username = "alaza";
-        when(userRepository.findByUsername(username)).thenReturn(optAlaza);
-        Optional<User> found = userService.getUserByUsername(username);
+        Optional<User> expectedUser = Optional.of(givenUserAlaza());
+        when(userRepository.findByUsername(username)).thenReturn(expectedUser);
 
-        assertEqualUser(optAlaza, found);
-        verify(userRepository, times(1)).findByUsername(username);
+        Optional<User> actualUser = userService.getUserByUsername(username);
+
+        assertEqualUser(expectedUser, actualUser);
+        verify(userRepository, atMostOnce()).findByUsername(username);
     }
 
     @Test
     void shouldGetUsers() {
-        when(userRepository.findAll()).thenReturn(users);
+        List<User> expectedUsers = Arrays.asList(givenUserAlaza(), givenUserAminou());
+        when(userRepository.findAll()).thenReturn(expectedUsers);
+
         List<User> actualUsers = userService.getUsers();
 
-        assertEqualUsers(users, actualUsers);
-        verify(userRepository, times(1)).findAll();
+        assertEqualUsers(expectedUsers, actualUsers);
+        verify(userRepository, atMostOnce()).findAll();
     }
 
     @Test
     void shouldGetUsersById() {
         List<Integer> ids = List.of(1, 2);
-        when(userRepository.findAllById(ids)).thenReturn(users);
+        List<User> expectedUsers = Arrays.asList(givenUserAlaza(), givenUserAminou());
+        when(userRepository.findAllById(ids)).thenReturn(expectedUsers);
+
         List<User> actualUsers = userService.getUsersById(ids);
 
-        assertEqualUsers(users, actualUsers);
-        verify(userRepository, times(1)).findAllById(ids);
+        assertEqualUsers(expectedUsers, actualUsers);
+        verify(userRepository, atMostOnce()).findAllById(ids);
     }
 
     @Test
     void shouldGetUsersByEmail() {
         List<String> emails = List.of("alaza@example.com", "bako@example.com");
-        when(userRepository.findAllByEmail(emails)).thenReturn(users);
+        List<User> expectedUsers = Arrays.asList(givenUserAlaza(), givenUserAminou());
+        when(userRepository.findAllByEmail(emails)).thenReturn(expectedUsers);
+
         List<User> actualUsers = userService.getUsersByEmail(emails);
 
-        assertEqualUsers(users, actualUsers);
-        verify(userRepository, times(1)).findAllByEmail(emails);
+        assertEqualUsers(expectedUsers, actualUsers);
+        verify(userRepository, atMostOnce()).findAllByEmail(emails);
     }
 
     @Test
     void getUsersByUsername() {
         List<String> usernames = List.of("alaza", "bako");
-        when(userRepository.findAllByUsername(usernames)).thenReturn(users);
+        List<User> expectedUsers = Arrays.asList(givenUserAlaza(), givenUserAminou());
+        when(userRepository.findAllByUsername(usernames)).thenReturn(expectedUsers);
+
         List<User> actualUsers = userService.getUsersByUsername(usernames);
 
-        assertEqualUsers(users, actualUsers);
-        verify(userRepository, times(1)).findAllByUsername(usernames);
+        assertEqualUsers(expectedUsers, actualUsers);
+        verify(userRepository, atMostOnce()).findAllByUsername(usernames);
     }
 
     @Test
     void deleteUser() {
-        doNothing().when(userRepository).delete(alaza);
-        userService.deleteUser(alaza);
+        User user = givenUserBako();
+        doNothing().when(userRepository).delete(user);
 
-        verify(userRepository, times(1)).delete(alaza);
+        userService.deleteUser(user);
+
+        verify(userRepository, atMostOnce()).delete(user);
     }
 
     @Test
     void deleteUserById() {
         Integer userId = 1;
         doNothing().when(userRepository).deleteById(userId);
+
         userService.deleteUserById(userId);
 
-        verify(userRepository, times(1)).deleteById(userId);
+        verify(userRepository, atMostOnce()).deleteById(userId);
     }
 
     @Test
     void deleteUserByEmail() {
         String email = "alaza@example.com";
         doNothing().when(userRepository).deleteByEmail(email);
+
         userService.deleteUserByEmail(email);
 
-        verify(userRepository, times(1)).deleteByEmail(email);
+        verify(userRepository, atMostOnce()).deleteByEmail(email);
     }
 
     @Test
     void deleteUserByUsername() {
         String username = "alaza";
         doNothing().when(userRepository).deleteByUsername(username);
+
         userService.deleteUserByUsername(username);
 
-        verify(userRepository, times(1)).deleteByUsername(username);
+        verify(userRepository, atMostOnce()).deleteByUsername(username);
     }
 
     @Test
     void deleteUsersByEmail() {
         List<String> emails = List.of("alaza@example.com", "bako@example.com");
         doNothing().when(userRepository).deleteAllByEmail(emails);
+
         userService.deleteUsersByEmail(emails);
 
-        verify(userRepository, times(1)).deleteAllByEmail(emails);
+        verify(userRepository, atMostOnce()).deleteAllByEmail(emails);
     }
 
     @Test
     void deleteUsersById() {
         List<Integer> ids = List.of(1, 2);
         doNothing().when(userRepository).deleteAllById(ids);
+
         userService.deleteUsersById(ids);
 
-        verify(userRepository, times(1)).deleteAllById(ids);
+        verify(userRepository, atMostOnce()).deleteAllById(ids);
     }
 
     @Test
     void deleteUsersByUsername() {
         List<String> usernames = List.of("alaza", "bako");
         doNothing().when(userRepository).deleteAllByUsername(usernames);
+
         userService.deleteUsersByUsername(usernames);
 
-        verify(userRepository, times(1)).deleteAllByUsername(usernames);
+        verify(userRepository, atMostOnce()).deleteAllByUsername(usernames);
     }
 
     @Test
     void countUsers() {
-        when(userRepository.count()).thenReturn(2);
+        int expected = 2;
+        when(userRepository.count()).thenReturn(expected);
 
-        int countUsers = userService.countUsers();
+        int actual = userService.countUsers();
 
-        assertThat(countUsers).isEqualTo(2);
-        verify(userRepository, times(1)).count();
+        assertThat(actual).isEqualTo(expected);
+        verify(userRepository, atMostOnce()).count();
     }
 
     private void assertEqualUser(User expectedUser, User actualUser) {
@@ -200,11 +224,24 @@ class UserServiceTest extends BaseTestCase {
     }
 
     private void assertEqualUsers(List<User> expectedUsers, List<User> actualUsers) {
-        assertThat(actualUsers).isNotEmpty()
-                .hasSize(2)
-                .isEqualTo(expectedUsers);
+        assertThat(actualUsers).isNotEmpty();
+        assertThat(actualUsers.size()).isEqualTo(expectedUsers.size());
 
-        assertEqualUser(expectedUsers.get(0), actualUsers.get(0));
-        assertEqualUser(expectedUsers.get(1), actualUsers.get(1));
+        for (int i = 0; i < expectedUsers.size(); i++) {
+            assertEqualUser(expectedUsers.get(i), actualUsers.get(i));
+        }
+    }
+
+
+    private User givenUserAlaza() {
+        return new User("alaza", "alaza@alaza.com");
+    }
+
+    private User givenUserBako() {
+        return new User("bako", "bako@bako.com");
+    }
+
+    private User givenUserAminou() {
+        return new User("aminou", "aminou@aminou.com");
     }
 }
